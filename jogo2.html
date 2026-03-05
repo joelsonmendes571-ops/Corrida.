@@ -1,0 +1,539 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>F1 ULTIMATE 2026 | WORLD CHAMPIONSHIP EDITION</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --f1-red: #e10600;
+            --f1-black: #15151e;
+            --asphalt: #222222;
+            --grass: #1a3c1a;
+            --gold: #ffd700;
+            --silver: #d1d1d1;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body, html {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: #000;
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            user-select: none;
+        }
+
+        canvas { display: block; }
+
+        /* --- UI DE MENU --- */
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 2000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            background: radial-gradient(circle, #222 0%, #000 100%);
+            transition: opacity 1s ease;
+        }
+
+        .menu-title {
+            font-size: 5rem; font-weight: 900; font-style: italic;
+            margin: 0; text-shadow: 0 0 40px rgba(225,6,0,0.6);
+            letter-spacing: -2px;
+        }
+        .menu-title span { color: var(--f1-red); }
+
+        .track-grid { display: flex; gap: 20px; margin: 40px 0; }
+        .track-card {
+            width: 240px; padding: 30px; border: 2px solid #333;
+            background: var(--f1-black); cursor: pointer;
+            transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center; position: relative; overflow: hidden;
+        }
+        .track-card:hover { border-color: var(--f1-red); transform: translateY(-10px); }
+        .track-card h3 { margin: 0; font-size: 1.2rem; }
+        .track-card p { color: #666; font-size: 0.8rem; margin-top: 10px; }
+
+        /* --- HUD DE CORRIDA --- */
+        #hud-container {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: none; z-index: 1000;
+        }
+
+        .telemetry-main {
+            position: absolute; bottom: 40px; left: 40px;
+            background: rgba(0,0,0,0.8); padding: 25px;
+            border-left: 10px solid var(--f1-red);
+            clip-path: polygon(0 0, 100% 0, 90% 100%, 0% 100%);
+            min-width: 300px;
+        }
+
+        .speed-unit { font-size: 70px; font-weight: 900; line-height: 0.8; font-style: italic; }
+        .speed-unit small { font-size: 20px; color: #888; font-style: normal; }
+        
+        .lap-counter {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 24px; color: var(--gold); margin-top: 15px;
+            border-top: 1px solid #444; padding-top: 10px;
+        }
+
+        /* --- MINI MAPA MELHORADO --- */
+        #minimap-box {
+            position: absolute; top: 40px; right: 40px;
+            width: 250px; height: 250px;
+            background: rgba(0,0,0,0.7);
+            border: 2px solid var(--f1-red);
+            border-radius: 15px; 
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 20px rgba(225,6,0,0.2);
+            overflow: hidden;
+        }
+        #minimap-canvas { width: 100%; height: 100%; }
+
+        /* --- LUZES DE LARGADA --- */
+        #start-lights {
+            position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+            display: none; background: #111; padding: 20px 40px;
+            border: 5px solid #333; border-radius: 15px; gap: 20px;
+        }
+        .light-bulb { width: 50px; height: 50px; border-radius: 50%; background: #222; }
+        .active-red { background: #f00; box-shadow: 0 0 40px #f00; }
+        .active-green { background: #0f0; box-shadow: 0 0 40px #0f0; }
+
+        button {
+            background: var(--f1-red); color: #fff; border: none; padding: 18px 50px;
+            font-family: 'Orbitron'; font-weight: 900; cursor: pointer; transition: 0.3s;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        button:hover { background: #fff; color: #000; box-shadow: 0 0 30px #fff; }
+
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h1 class="menu-title">F1 <span>ULTIMATE</span></h1>
+        <p style="letter-spacing: 10px; color: #555; margin-bottom: 40px;">PRO SIMULATOR 2026</p>
+        
+        <div class="track-grid">
+            <div class="track-card" onclick="initGame('INTERLAGOS')">
+                <h3>SAO PAULO GP</h3>
+                <p>INTERLAGOS - 4.309 KM</p>
+            </div>
+            <div class="track-card" onclick="initGame('MONACO')">
+                <h3>MONACO GP</h3>
+                <p>MONTE CARLO - 3.337 KM</p>
+            </div>
+            <div class="track-card" onclick="initGame('SPA')">
+                <h3>BELGIAN GP</h3>
+                <p>SPA-FRANCORCHAMPS - 7.004 KM</p>
+            </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.05); padding: 25px; border-radius: 12px; display: flex; align-items: center; gap: 20px;">
+            <label>TEAM LIVERY:</label>
+            <input type="color" id="carColor" value="#e10600">
+            <label>OPPONENT DIFFICULTY:</label>
+            <select id="difficulty" style="background:#222; color:#fff; border:1px solid #444; padding:5px;">
+                <option value="1">ROOKIE</option>
+                <option value="1.5">PRO</option>
+                <option value="2">LEGEND</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="start-lights">
+        <div class="light-bulb" id="lb1"></div>
+        <div class="light-bulb" id="lb2"></div>
+        <div class="light-bulb" id="lb3"></div>
+        <div class="light-bulb" id="lb4"></div>
+        <div class="light-bulb" id="lb5"></div>
+    </div>
+
+    <div id="hud-container">
+        <div class="telemetry-main">
+            <div class="speed-unit"><span id="speed-txt">0</span> <small>KM/H</small></div>
+            <div class="lap-counter" id="lap-txt">LAP 1 / 3</div>
+            <div id="timer-txt" style="font-family: 'Roboto Mono'; color:#aaa; font-size:14px; margin-top:5px;">TIME: 00:00.00</div>
+        </div>
+
+        <div id="minimap-box">
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+    </div>
+
+    <canvas id="mainCanvas"></canvas>
+
+<script>
+/**
+ * F1 ULTIMATE 2026 - FULL SOURCE
+ */
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+const mCanvas = document.getElementById('minimap-canvas');
+const mCtx = mCanvas.getContext('2d');
+
+let player, rivals = [], trackNodes = [], barriers = [], raceActive = false, gameState = 'MENU';
+let keys = {}, startTime = 0;
+
+const TRACKS = {
+    'INTERLAGOS': [
+        {x: 2000, y: 2000}, {x: 8000, y: 2000}, {x: 9000, y: 4000}, 
+        {x: 8500, y: 7000}, {x: 5000, y: 9000}, {x: 2000, y: 8000}, 
+        {x: 1000, y: 5000}
+    ],
+    'MONACO': [
+        {x: 1000, y: 1000}, {x: 6000, y: 1000}, {x: 6500, y: 4000},
+        {x: 8500, y: 4500}, {x: 8500, y: 8000}, {x: 1000, y: 8000}
+    ],
+    'SPA': [
+        {x: 2000, y: 2000}, {x: 12000, y: 2000}, {x: 13000, y: 6000},
+        {x: 10000, y: 10000}, {x: 4000, y: 12000}, {x: 1000, y: 6000}
+    ]
+};
+
+class F1Car {
+    constructor(x, y, color, isPlayer = false) {
+        this.x = x; this.y = y; this.color = color;
+        this.isPlayer = isPlayer;
+        this.angle = 0; this.speed = 0; this.laps = 1;
+        this.width = 90; this.height = 40;
+        this.checkpointIdx = 0;
+        this.targetNodeIdx = 1;
+    }
+
+    update() {
+        if (!raceActive) return;
+
+        if (this.isPlayer) {
+            // SISTEMA DE ACELERAÇÃO E RÉ
+            if (keys['w'] || keys['ArrowUp']) {
+                this.speed += 0.45;
+            } else if (keys['s'] || keys['ArrowDown']) {
+                if (this.speed > 0.5) {
+                    this.speed *= 0.92; // Freio
+                } else {
+                    this.speed -= 0.2; // Engata a Ré
+                }
+            }
+
+            // HANDLING (Ajustado para Ré)
+            let handling = Math.min(Math.abs(this.speed) / 12, 1.1);
+            let dir = this.speed >= 0 ? 1 : -1; // Inverte direção na ré
+            
+            if (keys['a'] || keys['ArrowLeft']) this.angle -= 0.048 * handling * dir;
+            if (keys['d'] || keys['ArrowRight']) this.angle += 0.048 * handling * dir;
+        } else {
+            this.driveAI();
+        }
+
+        this.speed *= 0.985; 
+        
+        let nextX = this.x + Math.cos(this.angle) * this.speed;
+        let nextY = this.y + Math.sin(this.angle) * this.speed;
+
+        if (!this.checkWallCollision(nextX, nextY)) {
+            this.x = nextX;
+            this.y = nextY;
+        } else {
+            this.speed *= -0.5;
+        }
+
+        this.logic();
+    }
+
+    driveAI() {
+        let target = trackNodes[this.targetNodeIdx];
+        let tx = target.x - this.x;
+        let ty = target.y - this.y;
+        let dist = Math.hypot(tx, ty);
+        let angleToTarget = Math.atan2(ty, tx);
+
+        let diff = angleToTarget - this.angle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        this.angle += diff * 0.05;
+        this.speed += 0.4;
+        
+        if (dist < 800) {
+            this.targetNodeIdx = (this.targetNodeIdx + 1) % trackNodes.length;
+        }
+    }
+
+    checkWallCollision(nx, ny) {
+        let onTrack = false;
+        for (let i = 0; i < trackNodes.length; i++) {
+            let p1 = trackNodes[i];
+            let p2 = trackNodes[(i + 1) % trackNodes.length];
+            let dist = this.distToSegment({x: nx, y: ny}, p1, p2);
+            if (dist < 450) {
+                onTrack = true;
+                break;
+            }
+        }
+        return !onTrack;
+    }
+
+    distToSegment(p, v, w) {
+        let l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
+        if (l2 == 0) return Math.hypot(p.x - v.x, p.y - v.y);
+        let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+    }
+
+    logic() {
+        let finishLine = trackNodes[0];
+        let dist = Math.hypot(this.x - finishLine.x, this.y - finishLine.y);
+        
+        if (dist < 500 && this.checkpointIdx >= trackNodes.length - 2) {
+            this.laps++;
+            this.checkpointIdx = 0;
+            if (this.isPlayer) {
+                document.getElementById('lap-txt').innerText = `LAP ${Math.min(this.laps, 3)} / 3`;
+                if (this.laps > 3) endGame();
+            }
+        }
+
+        let nextCP = trackNodes[(this.checkpointIdx + 1) % trackNodes.length];
+        if (Math.hypot(this.x - nextCP.x, this.y - nextCP.y) < 1000) {
+            this.checkpointIdx++;
+        }
+    }
+
+    render(tCtx) {
+        tCtx.save();
+        tCtx.translate(this.x, this.y);
+        tCtx.rotate(this.angle);
+
+        // --- DETALHAMENTO DO CARRO (REALISMO F1) ---
+        tCtx.fillStyle = '#111';
+        tCtx.fillRect(-48, -32, 28, 16); 
+        tCtx.fillRect(-48, 16, 28, 16);
+        tCtx.fillRect(20, -30, 24, 14); 
+        tCtx.fillRect(20, 16, 24, 14);
+
+        tCtx.strokeStyle = '#333';
+        tCtx.lineWidth = 2;
+        tCtx.beginPath();
+        tCtx.moveTo(0,0); tCtx.lineTo(30, -25);
+        tCtx.moveTo(0,0); tCtx.lineTo(30, 25);
+        tCtx.moveTo(-20,0); tCtx.lineTo(-40, -25);
+        tCtx.moveTo(-20,0); tCtx.lineTo(-40, 25);
+        tCtx.stroke();
+
+        tCtx.fillStyle = this.color;
+        tCtx.beginPath();
+        tCtx.moveTo(-50, -18); 
+        tCtx.quadraticCurveTo(-10, -22, 10, -20); 
+        tCtx.lineTo(60, -6); 
+        tCtx.lineTo(60, 6);  
+        tCtx.lineTo(10, 20); 
+        tCtx.quadraticCurveTo(-10, 22, -50, 18);
+        tCtx.closePath();
+        tCtx.fill();
+        
+        tCtx.fillStyle = 'rgba(255,255,255,0.15)';
+        tCtx.fillRect(-30, -12, 40, 5);
+
+        tCtx.fillStyle = '#000';
+        tCtx.fillRect(-55, -30, 12, 60);
+        tCtx.fillStyle = '#222';
+        tCtx.fillRect(-52, -28, 5, 56);
+
+        tCtx.fillStyle = '#111';
+        tCtx.fillRect(45, -30, 8, 60);
+        
+        tCtx.fillStyle = '#000';
+        tCtx.beginPath();
+        tCtx.ellipse(5, 0, 15, 8, 0, 0, Math.PI * 2);
+        tCtx.fill();
+        
+        tCtx.fillStyle = '#fff';
+        tCtx.beginPath();
+        tCtx.arc(2, 0, 5, 0, Math.PI * 2);
+        tCtx.fill();
+        tCtx.fillStyle = '#000'; 
+        tCtx.fillRect(3, -3, 3, 6);
+
+        tCtx.fillStyle = '#ff0';
+        tCtx.fillRect(-10, -2, 6, 4);
+
+        tCtx.restore();
+    }
+}
+
+function initGame(tKey) {
+    trackNodes = TRACKS[tKey];
+    let color = document.getElementById('carColor').value;
+    
+    player = new F1Car(trackNodes[0].x, trackNodes[0].y, color, true);
+    
+    rivals = [
+        new F1Car(trackNodes[0].x - 150, trackNodes[0].y + 100, '#00d2be'),
+        new F1Car(trackNodes[0].x - 300, trackNodes[0].y - 100, '#ff8700')
+    ];
+
+    document.getElementById('overlay').style.opacity = '0';
+    setTimeout(() => {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('hud-container').style.display = 'block';
+        startSequence();
+    }, 1000);
+
+    window.addEventListener('keydown', e => keys[e.key] = true);
+    window.addEventListener('keyup', e => keys[e.key] = false);
+
+    resize();
+    requestAnimationFrame(gameLoop);
+}
+
+function startSequence() {
+    let lights = document.getElementById('start-lights');
+    lights.style.display = 'flex';
+    let i = 1;
+    let timer = setInterval(() => {
+        if(i <= 5) {
+            document.getElementById('lb'+i).classList.add('active-red');
+            i++;
+        } else {
+            clearInterval(timer);
+            setTimeout(() => {
+                document.querySelectorAll('.light-bulb').forEach(l => {
+                    l.classList.remove('active-red');
+                    l.classList.add('active-green');
+                });
+                raceActive = true;
+                startTime = Date.now();
+                setTimeout(() => lights.style.display = 'none', 2000);
+            }, 1000 + Math.random()*2000);
+        }
+    }, 1000);
+}
+
+function gameLoop() {
+    ctx.fillStyle = '#1a3c1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(canvas.width/2, canvas.height*0.7);
+    ctx.rotate(-player.angle - Math.PI/2);
+    ctx.translate(-player.x, -player.y);
+
+    renderTrack();
+
+    player.update();
+    player.render(ctx);
+
+    rivals.forEach(r => {
+        r.update();
+        r.render(ctx);
+    });
+
+    ctx.restore();
+
+    updateHUD();
+    drawMinimap();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function renderTrack() {
+    ctx.beginPath();
+    ctx.moveTo(trackNodes[0].x, trackNodes[0].y);
+    trackNodes.forEach(n => ctx.lineTo(n.x, n.y));
+    ctx.closePath();
+
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 550; ctx.stroke();
+    ctx.strokeStyle = '#e10600'; ctx.lineWidth = 550; ctx.setLineDash([50, 50]); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 500; ctx.stroke();
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 20; ctx.stroke();
+
+    trackNodes.forEach((n, i) => {
+        ctx.fillStyle = '#333';
+        ctx.fillRect(n.x + 800, n.y - 300, 400, 600);
+        ctx.fillStyle = '#444';
+        ctx.fillRect(n.x + 780, n.y - 320, 440, 20);
+        ctx.fillStyle = '#e10600';
+        ctx.fillRect(n.x + 800, n.y - 50, 400, 40);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 20px Orbitron';
+        ctx.fillText("F1 ULTIMATE", n.x + 820, n.y - 22);
+        ctx.fillStyle = '#0d210d';
+        ctx.beginPath();
+        ctx.arc(n.x - 900, n.y, 200, 0, Math.PI*2);
+        ctx.fill();
+    });
+}
+
+function updateHUD() {
+    document.getElementById('speed-txt').innerText = Math.abs(Math.floor(player.speed * 18));
+    let time = (Date.now() - startTime) / 1000;
+    if(raceActive) document.getElementById('timer-txt').innerText = `TIME: ${time.toFixed(2)}s`;
+}
+
+function drawMinimap() {
+    mCtx.clearRect(0,0,mCanvas.width, mCanvas.height);
+    mCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+    mCtx.lineWidth = 1;
+    for(let i=0; i<mCanvas.width; i+=20) {
+        mCtx.beginPath(); mCtx.moveTo(i,0); mCtx.lineTo(i,mCanvas.height); mCtx.stroke();
+        mCtx.beginPath(); mCtx.moveTo(0,i); mCtx.lineTo(mCanvas.width,i); mCtx.stroke();
+    }
+
+    mCtx.save();
+    mCtx.translate(125, 125);
+    mCtx.scale(0.012, 0.012); 
+    mCtx.rotate(-Math.PI/2);
+
+    mCtx.beginPath();
+    mCtx.moveTo(trackNodes[0].x, trackNodes[0].y);
+    trackNodes.forEach(n => mCtx.lineTo(n.x, n.y));
+    mCtx.closePath();
+    mCtx.strokeStyle = 'rgba(255,255,255,0.2)';
+    mCtx.lineWidth = 600;
+    mCtx.stroke();
+
+    rivals.forEach(r => {
+        mCtx.fillStyle = '#fff';
+        mCtx.beginPath(); mCtx.arc(r.x, r.y, 300, 0, Math.PI*2); mCtx.fill();
+    });
+
+    mCtx.save();
+    mCtx.translate(player.x, player.y);
+    mCtx.rotate(player.angle);
+    mCtx.fillStyle = player.color;
+    mCtx.beginPath();
+    mCtx.moveTo(600, 0);
+    mCtx.lineTo(-400, -400);
+    mCtx.lineTo(-400, 400);
+    mCtx.closePath();
+    mCtx.fill();
+    mCtx.shadowBlur = 2000;
+    mCtx.shadowColor = player.color;
+    mCtx.stroke();
+    mCtx.restore();
+
+    mCtx.restore();
+}
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    mCanvas.width = 250; mCanvas.height = 250;
+}
+
+function endGame() {
+    raceActive = false;
+    alert("FINISH! FINAL TIME: " + document.getElementById('timer-txt').innerText);
+    location.reload();
+}
+
+window.addEventListener('resize', resize);
+</script>
+</body>
+</html>
